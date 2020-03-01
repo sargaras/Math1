@@ -3,55 +3,64 @@ import numpy as np
 
 class AModel(ABC):
 
-    def __init__(self, SamplingIncrement: float, t0: float, t1: float) ->None:
-        self.__SamplingIncrement = SamplingIncrement
-        self.__t0 = t0
-        self.__t1 = t1
-        self.__X0 = np.zeros(6)
-        self.__Result = np.zeros((0,self.__X0.size))
+    def __init__(self, t0: float, t1: float, SamplingIncrement: float) ->None:
+        self._SamplingIncrement = SamplingIncrement
+        self._t0 = t0
+        self._t1 = t1
+        self._X0 = np.array([])
+        self._Result = np.zeros((0,self._X0.size))
+        self._N=0
 
     @abstractmethod
-    def getRight(self, X: np.array, t: float):
+    def getRight(self, X: np.array, t: float) ->np.array:
         """to calculate the increment"""
 
     def getInitialConditions(self) ->np.array:
-        return self.__X0
+        return self._X0
 
     def getOrder(self) ->int:
-        return self.__X0.size
+        return self._X0.size
 
     def getSamplingIncrement(self) ->float:
-        return self.__SamplingIncrement
+        return self._SamplingIncrement
 
     def getT0(self) ->float:
-        return self.__t0
+        return self._t0
 
     def getT1(self) ->float:
-        return self.__t1
+        return self._t1
 
-    def getResult(self) ->np.array
-        return self.__Result
+    def getResult(self) ->np.array: 
+        return self._Result
 
     def addResult(self, X: np.array, t:float) ->None:
-        self.__Result = np.vstack((self.__Result,X))
+        local_res=np.zeros(len(X)+1,float)
+        local_res[0]=t
+        for i in range(len(X)):
+            local_res[i+1]=X[i]
+        if self._N==0:
+            self._Result=local_res
+            self._N=self._N+1
+        else:
+            self._Result = np.vstack((self._Result,local_res))
+
+        
+
 
     def clearResults(self) ->None:
-        self.__Result = np.array([])   # может тут стоит поискать другую функцию, а не создавать с нуля массив
+        self._Result = np.array([])   # может тут стоит поискать другую функцию, а не создавать с нуля массив
 
 
-class TestSin(AModel):
-    def getRight(self, X: np.array, t: float):
-        return np.cos(X)
 
 class AIntegrator(ABC):
     def __init__(self) ->None:
-        self.__Eps = 1e-8
+        self._Eps = 1e-8
 
     def setPrecision(self, Eps: float) ->None:
-        self.__Eps = Eps
+        self._Eps = Eps
 
     def getPrecision(self) ->float:
-        return self.__Eps
+        return self._Eps
 
     @abstractmethod
     def Run(self, Model: AModel):
@@ -85,7 +94,7 @@ class TDormandPrince(AIntegrator):
         h_new = Model.getSamplingIncrement()
         e = 0
         X = Model.getInitialConditions()
-        K = np.zeros(7)
+        K = np.zeros((7,X.size))
 
         while t < t1:
             h = h_new
@@ -100,19 +109,19 @@ class TDormandPrince(AIntegrator):
             X1 = X + K[0] * self.__b1[0] * h + K[1] * self.__b1[1] * h + K[2] * self.__b1[2] * h + K[3] * self.__b1[3] * h + K[4] * self.__b1[4] * h + K[5] * self.__b1[5] * h + K[6] * self.__b1[6] * h
             X2 = X + K[0] * self.__b2[0] * h + K[1] * self.__b2[1] * h + K[2] * self.__b2[2] * h + K[3] * self.__b2[3] * h + K[4] * self.__b2[4] * h + K[5] * self.__b2[5] * h + K[6] * self.__b2[6] * h
 
-            e1 = 0
+            e1 = 0.
             max0 = np.zeros(X.size)
             for i in range(X.size):
-                max1 = np.array([0.00001 , abs(X1[i]), abs(X[i]) , 0.5*u/Eps])
+                max1 = np.array([0.00001 , abs(X1[i]), abs(X[i]) , 0.5*self.__u/self._Eps])
                 max0[i] = max1.max()
-                e1+=((h*X1[i]-X2[i])/max0[i])**2
+                e1+=(h*(X1[i]-X2[i])/max0[i])**2
 
             e = (e1/X.size)**0.5
 
-            if 5 > ((e / self.__Eps) ** 0.2)/0.9:
-                min0 = ((e / self.__Eps) ** 0.2)/0.9
+            if 5. > ((e / self._Eps) ** 0.2)/0.9:
+                min0 = ((e / self._Eps) ** 0.2)/0.9
             else:
-                min0 = 5
+                min0 = 5.
 
             if 0.1 >= min0:
                 max2=0.1
@@ -121,7 +130,7 @@ class TDormandPrince(AIntegrator):
 
             h_new = h / max2
 
-            if e > self.__Eps:
+            if e > self._Eps:
                 continue
 
             while (t_out < t + h) and (t_out <= t1):
